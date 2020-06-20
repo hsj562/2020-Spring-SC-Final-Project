@@ -2,6 +2,7 @@ import numpy as np
 
 FRAME_SIZE = 0.016
 THRESHOLD = 15
+ERR_BOUND = 419
 
 def trim_data(pitch_set):
     trimmed_set = []
@@ -48,38 +49,47 @@ def solve(pitch_set):
             can1 = np.sum(np.abs(temp - np.median(temp)))
             can2 = err_table[note_idx-1][i-1]
             if can1 == can2:
-                if cnt < 3:
+                if cnt < 2:
                     cur_note = temp
                     row[i] = can1 + 0.01
                     cnt += 1
                 else:
                     row[i] = can2
                     cnt = 1
+                    cur_note = np.array(pitch_set[i][1])
             elif can1 < can2:
-                if cnt > 8 and abs(can1-can2) < THRESHOLD:
+                if cnt > 60 and abs(can1-can2) < THRESHOLD:
                     row[i] = can2
                     cnt = 1
+                    cur_note = np.array(pitch_set[i][1])
                 else:
                     cur_note = temp
                     row[i] = can1
                     cnt += 1
             else:
-                if cnt < 3 and abs(can1 - can2) < THRESHOLD:
+                if cnt < 2 and abs(can1 - can2) < THRESHOLD:
                     cur_note = temp
                     row[i] = can1
                     cnt += 1
                 else :
                     row[i] = can2
                     cnt = 1
+                    cur_note = np.array(pitch_set[i][1])
         err_table.append(row)
 
-    #print("backtracking")
+    #print("backtracking") 
+
     # backtracking
     ret = []
 
 
     cur_pos = data_len-1
     cur_note = predict_note-1
+
+    #print(f'bound: {2.5*predict_note}')
+    for i in range(predict_note):
+        if err_table[data_len-1][i] <= ERR_BOUND:
+            cur_note = i
     
     this_note = [0, pitch_set[cur_pos][0]+FRAME_SIZE , 0] # onset offset pitch
     note_pitch = [pitch_set[cur_pos][1]]
@@ -108,13 +118,12 @@ def solve(pitch_set):
 def process(pitch_set):
     res = []
     dat = trim_data(pitch_set)
-    '''
-    subset_cnt = 0
-    '''
+    
+    #subset_cnt = 0
 
     for subset in dat:
         '''
-        print(f'subset no: {subset_cnt}')
+        print(f'subset: {subset}')
         subset_cnt += 1
         '''
         ans = solve(subset)    
@@ -123,7 +132,7 @@ def process(pitch_set):
     toRemove = []
     for i in range(1,len(res)):
         if abs(res[i][2] - res[i-1][2]) <= 1 and abs(res[i][0] - res[i-1][1]) < 3*FRAME_SIZE:
-            print(res[i][0], res[i-1][0])
+            # print(res[i][0], res[i-1][0])
             res[i][0] = res[i-1][0]
             res[i][2] = int(round( (res[i][2] + res[i-1][2])/2 ))
             toRemove += [i-1]
